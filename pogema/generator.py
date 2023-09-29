@@ -104,6 +104,11 @@ def placing(order, components, grid, start_id, num_agents):
     return positions_xy, finishes_xy
 
 
+def generate_orientations_fast(grid_config):
+    np.random.seed(grid_config.seed)
+    return np.random.randint(4, size=grid_config.num_agents)
+
+
 def generate_positions_and_targets_fast(obstacles, grid_config):
     c = grid_config
     grid = obstacles.copy()

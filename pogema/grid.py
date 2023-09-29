@@ -1,11 +1,10 @@
-import random
 from copy import deepcopy
 import warnings
 
 import numpy as np
 
 from pogema.generator import generate_obstacles, generate_positions_and_targets_fast, \
-    get_components
+    get_components, generate_orientations_fast
 from .grid_config import GridConfig
 from .grid_registry import in_registry, get_grid
 from .utils import render_grid
@@ -47,7 +46,7 @@ class Grid:
 
         if grid_config.with_orientations:
             if grid_config.orientations is None:
-                grid_config.orientations = [random.randint(0, 3) for _ in range(len(self.starts_xy))]
+                grid_config.orientations = generate_orientations_fast(grid_config)
             self.orientations = grid_config.orientations
         if len(self.starts_xy) != len(self.finishes_xy):
             for attempt in range(num_retries):
