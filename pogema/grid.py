@@ -1,3 +1,4 @@
+import random
 from copy import deepcopy
 import warnings
 
@@ -44,6 +45,10 @@ class Grid:
         else:
             self.starts_xy, self.finishes_xy = generate_positions_and_targets_fast(self.obstacles, self.config)
 
+        if grid_config.with_orientations:
+            if grid_config.orientations is None:
+                grid_config.orientations = [random.randint(0, 3) for _ in range(len(self.starts_xy))]
+            self.orientations = grid_config.orientations
         if len(self.starts_xy) != len(self.finishes_xy):
             for attempt in range(num_retries):
                 if len(self.starts_xy) == len(self.finishes_xy):
@@ -205,6 +210,13 @@ class Grid:
         result[c.obs_radius - dx, c.obs_radius - dy] = 1
         return result.astype(np.float32)
 
+    def get_dx_dy(self, agent_idx, action_idx):
+        if self.config.with_orientations:
+            dx, dy, _ = self.config.OMOVES[self.orientations[agent_idx]][action_idx]
+        else:
+            dx, dy = self.config.MOVES[action_idx]
+        return dx, dy
+
     def render(self, mode='human'):
         render_grid(self.obstacles, self.positions_xy, self.finishes_xy, self.is_active, mode=mode)
 
@@ -222,14 +234,22 @@ class Grid:
 
     def move_without_checks(self, agent_id, action):
         x, y = self.positions_xy[agent_id]
-        dx, dy = self.config.MOVES[action]
+        if self.config.with_orientations:
+            dx, dy, new_o = self.config.OMOVES[self.orientations[agent_id]][action]
+            self.orientations[agent_id] = new_o
+        else:
+            dx, dy = self.config.MOVES[action]
         self.positions[x, y] = self.config.FREE
         self.positions[x+dx, y+dy] = self.config.OBSTACLE
         self.positions_xy[agent_id] = (x+dx, y+dy)
 
     def move(self, agent_id, action):
         x, y = self.positions_xy[agent_id]
-        dx, dy = self.config.MOVES[action]
+        if self.config.with_orientations:
+            dx, dy, new_o = self.config.OMOVES[self.orientations[agent_id]][action]
+            self.orientations[agent_id] = new_o
+        else:
+            dx, dy = self.config.MOVES[action]
         if self.obstacles[x + dx, y + dy] == self.config.FREE:
             if self.positions[x + dx, y + dy] == self.config.FREE:
                 self.positions[x, y] = self.config.FREE

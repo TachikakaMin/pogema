@@ -290,19 +290,23 @@ class AnimationMonitor(Wrapper):
 
         agents = []
         targets = []
-
+        orientations = []
         if anim_cfg.show_agents:
-            agents = self.create_agents(gh, anim_cfg)
+            if self.grid_config.with_orientations:
+                agents, orientations = self.create_agents(gh, anim_cfg)
+            else:
+                agents = self.create_agents(gh, anim_cfg)
             targets = self.create_targets(gh, anim_cfg)
 
             if not anim_cfg.static:
                 self.animate_agents(agents, anim_cfg.egocentric_idx, gh)
+                self.animate_orientations(orientations, anim_cfg.egocentric_idx, gh)
                 self.animate_targets(targets, gh, anim_cfg)
         if anim_cfg.show_lines:
             grid_lines = self.create_grid_lines(gh, anim_cfg, render_width, render_height)
             for line in grid_lines:
                 drawing.add_element(line)
-        for obj in [*obstacles, *agents, *targets, ]:
+        for obj in [*obstacles, *agents, *orientations, *targets, ]:
             drawing.add_element(obj)
 
         if anim_cfg.egocentric_idx is not None:
@@ -431,6 +435,47 @@ class AnimationMonitor(Wrapper):
         view.add_animation(self.compressed_anim('y', y_path, cfg.time_scale))
         view.add_animation(self.compressed_anim('visibility', visibility, cfg.time_scale))
 
+    def animate_orientations(self, orientations, egocentric_idx, grid_holder):
+        """
+        Animates the orientation of agents.
+        :param orientations:
+        :param egocentric_idx:
+        :param grid_holder:
+        :return:
+        """
+        gh: GridHolder = grid_holder
+        cfg = self.svg_settings
+
+        offsets = [[1, 0], [0, -1], [-1, 0], [0, 1]]
+        for agent_idx, orientation in enumerate(orientations):
+            x1_path = []
+            y1_path = []
+            x2_path = []
+            y2_path = []
+            opacity = []
+            for idx, agent_state in enumerate(gh.history[agent_idx]):
+                x, y, o = agent_state.get_pos()
+                x1_path.append(str(cfg.draw_start + y * cfg.scale_size + cfg.r*offsets[o][0]))
+                y1_path.append(str(-cfg.draw_start + -(gh.width - x - 1) * cfg.scale_size + cfg.r*offsets[o][1]))
+                x2_path.append(str(cfg.draw_start + y * cfg.scale_size))
+                y2_path.append(str(-cfg.draw_start + -(gh.width - x - 1) * cfg.scale_size))
+                if egocentric_idx is not None:
+                    ego_x, ego_y = gh.history[egocentric_idx][idx].get_xy()
+                    if self.check_in_radius(x, y, ego_x, ego_y, self.grid_config.obs_radius):
+                        opacity.append('1.0')
+                    else:
+                        opacity.append(str(cfg.shaded_opacity))
+
+            visibility = ['visible' if state.is_active() else 'hidden' for state in gh.history[agent_idx]]
+
+            orientation.add_animation(self.compressed_anim('y1', y1_path, cfg.time_scale))
+            orientation.add_animation(self.compressed_anim('x1', x1_path, cfg.time_scale))
+            orientation.add_animation(self.compressed_anim('y2', y2_path, cfg.time_scale))
+            orientation.add_animation(self.compressed_anim('x2', x2_path, cfg.time_scale))
+            orientation.add_animation(self.compressed_anim('visibility', visibility, cfg.time_scale))
+            if opacity:
+                orientation.add_animation(self.compressed_anim('opacity', opacity, cfg.time_scale))
+
     def animate_agents(self, agents, egocentric_idx, grid_holder):
         """
         Animates the agents.
@@ -445,14 +490,14 @@ class AnimationMonitor(Wrapper):
             x_path = []
             y_path = []
             opacity = []
-            for agent_state in gh.history[agent_idx]:
+            for idx, agent_state in enumerate(gh.history[agent_idx]):
                 x, y = agent_state.get_xy()
 
                 x_path.append(str(cfg.draw_start + y * cfg.scale_size))
                 y_path.append(str(-cfg.draw_start + -(gh.width - x - 1) * cfg.scale_size))
 
                 if egocentric_idx is not None:
-                    ego_x, ego_y = agent_state.get_xy()
+                    ego_x, ego_y = gh.history[egocentric_idx][idx].get_xy()
                     if self.check_in_radius(x, y, ego_x, ego_y, self.grid_config.obs_radius):
                         opacity.append('1.0')
                     else:
@@ -641,6 +686,8 @@ class AnimationMonitor(Wrapper):
         cfg = self.svg_settings
 
         agents = []
+        orientations = []
+        offsets = [[1, 0], [0, -1], [-1, 0], [0, 1]]
         initial_positions = [agent_states[0].get_xy() for agent_states in gh.history]
         for idx, (x, y) in enumerate(initial_positions):
 
@@ -660,9 +707,21 @@ class AnimationMonitor(Wrapper):
                     circle_settings.update(fill=self.svg_settings.ego_color)
                 else:
                     circle_settings.update(fill=self.svg_settings.ego_other_color)
-            agent = Circle(**circle_settings)
-            agents.append(agent)
+            circle = Circle(**circle_settings)
+            if self.grid_config.with_orientations:
+                orientation = self.grid_config.orientations[idx]
+                line_settings = {}
+                line_settings.update(x1=cfg.draw_start + y * cfg.scale_size + cfg.r*offsets[orientation][0],
+                                     y1=cfg.draw_start + (gh.width - x - 1) * cfg.scale_size + cfg.r*offsets[orientation][1],
+                                     x2=cfg.draw_start + y * cfg.scale_size,
+                                     y2=cfg.draw_start + (gh.width - x - 1) * cfg.scale_size,
+                                     stroke='#000000', stroke_width=cfg.stroke_width)
+                line = Line(**line_settings)
+                orientations.append(line)
+            agents.append(circle)
 
+        if self.grid_config.with_orientations:
+            return agents, orientations
         return agents
 
     def create_targets(self, grid_holder, animation_config):

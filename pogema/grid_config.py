@@ -16,10 +16,13 @@ class GridConfig(CommonSettings, ):
     obs_radius: int = 5
     agents_xy: Optional[list] = None
     targets_xy: Optional[list] = None
+    orientations: Optional[list] = None
     collision_system: Literal['block_both', 'priority', 'soft'] = 'priority'
     persistent: bool = False
     observation_type: Literal['POMAPF', 'MAPF', 'default'] = 'default'
     map: Union[list, str] = None
+    with_orientations: bool = False
+
 
     map_name: str = None
 

@@ -46,8 +46,10 @@ class PogemaBase(gymnasium.Env):
         # noinspection PyTypeChecker
         self.grid: Grid = None
         self.grid_config = grid_config
-
-        self.action_space: gymnasium.spaces.Discrete = gymnasium.spaces.Discrete(len(self.grid_config.MOVES))
+        if self.grid_config.with_orientations:
+            self.action_space: gymnasium.spaces.Discrete = gymnasium.spaces.Discrete(len(self.grid_config.OMOVES))
+        else:
+            self.action_space: gymnasium.spaces.Discrete = gymnasium.spaces.Discrete(len(self.grid_config.MOVES))
         self._multi_action_sampler = ActionsSampler(self.action_space.n, seed=self.grid_config.seed)
 
     def _get_agents_obs(self, agent_id=0):
@@ -231,13 +233,13 @@ class Pogema(PogemaBase):
             agents_xy = self.grid.get_agents_xy()
             for agent_idx, (x, y) in enumerate(agents_xy):
                 if self.grid.is_active[agent_idx]:
-                    dx, dy = self.grid_config.MOVES[actions[agent_idx]]
+                    dx, dy = self.grid.get_dx_dy(agent_idx, actions[agent_idx])
                     used_cells[x + dx, y + dy] = 'blocked' if (x + dx, y + dy) in used_cells else 'visited'
                     used_cells[x, y] = 'blocked'
             for agent_idx in range(self.grid_config.num_agents):
                 if self.grid.is_active[agent_idx]:
                     x, y = agents_xy[agent_idx]
-                    dx, dy = self.grid_config.MOVES[actions[agent_idx]]
+                    dx, dy = self.grid.get_dx_dy(agent_idx, actions[agent_idx])
                     if used_cells.get((x + dx, y + dy), None) != 'blocked':
                         self.grid.move(agent_idx, actions[agent_idx])
         elif self.grid.config.collision_system == 'soft':
@@ -246,14 +248,14 @@ class Pogema(PogemaBase):
             agents_xy = self.grid.get_agents_xy()
             for agent_idx, (x, y) in enumerate(agents_xy):
                 if self.grid.is_active[agent_idx]:
-                    dx, dy = self.grid.config.MOVES[actions[agent_idx]]
+                    dx, dy = self.grid.get_dx_dy(agent_idx, actions[agent_idx])
                     used_cells.setdefault((x + dx, y + dy), []).append(agent_idx)
                     used_edges[x, y, x + dx, y + dy] = [agent_idx]
                     if dx != 0 or dy != 0:
                         used_edges.setdefault((x + dx, y + dy, x, y), []).append(agent_idx)
             for agent_idx, (x, y) in enumerate(agents_xy):
                 if self.grid.is_active[agent_idx]:
-                    dx, dy = self.grid.config.MOVES[actions[agent_idx]]
+                    dx, dy = self.grid.get_dx_dy(agent_idx, actions[agent_idx])
                     if len(used_edges[x, y, x + dx, y + dy]) > 1:
                         used_cells[x + dx, y + dy].remove(agent_idx)
                         used_cells.setdefault((x, y), []).append(agent_idx)
@@ -261,7 +263,7 @@ class Pogema(PogemaBase):
             for agent_idx in reversed(range(len(agents_xy))):
                 x, y = agents_xy[agent_idx]
                 if self.grid.is_active[agent_idx]:
-                    dx, dy = self.grid.config.MOVES[actions[agent_idx]]
+                    dx, dy = self.grid.get_dx_dy(agent_idx, actions[agent_idx])
                     if len(used_cells[x + dx, y + dy]) > 1 or self.grid.has_obstacle(x + dx, y + dy):
                         actions, used_cells = self._revert_action(agent_idx, used_cells, (x + dx, y + dy), actions)
             for agent_idx in range(self.grid_config.num_agents):

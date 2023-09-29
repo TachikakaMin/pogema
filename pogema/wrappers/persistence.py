@@ -27,6 +27,22 @@ class AgentState:
         return self.x == o.x and self.y == o.y and self.tx == o.tx and self.ty == o.ty and self.active == o.active
 
 
+class AgentStateWithOrientation(AgentState):
+    def __init__(self, x, y, o, tx, ty, step, active):
+        super(AgentStateWithOrientation, self).__init__(x, y, tx, ty, step, active)
+        self.o = o
+
+    def get_o(self):
+        return self.o
+
+    def get_pos(self):
+        return self.x, self.y, self.o
+
+    def __eq__(self, other):
+        o = other
+        return self.x == o.x and self.y == o.y and self.o == o.o and self.tx == o.tx and self.ty == o.ty and self.active == o.active
+
+
 class PersistentWrapper(Wrapper):
     def __init__(self, env):
         super().__init__(env)
@@ -67,6 +83,9 @@ class PersistentWrapper(Wrapper):
         x, y = grid.positions_xy[agent_idx]
         tx, ty = grid.finishes_xy[agent_idx]
         active = grid.is_active[agent_idx]
+        if grid.config.with_orientations:
+            o = grid.orientations[agent_idx]
+            return AgentStateWithOrientation(x, y, o, tx, ty, self._step, active)
         return AgentState(x, y, tx, ty, self._step, active)
 
     def reset(self, **kwargs):

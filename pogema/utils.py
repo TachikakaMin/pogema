@@ -50,7 +50,6 @@ def render_grid(obstacles, positions_xy=None, targets_xy=None, is_active=None, m
     import string
     from gymnasium import utils as gym_utils
     from contextlib import closing
-
     outfile = StringIO() if mode == 'ansi' else sys.stdout
     chars = string.digits + string.ascii_letters + string.punctuation
     positions_map = {(x, y): id_ for id_, (x, y) in enumerate(positions_xy) if is_active[id_]}
@@ -82,6 +81,11 @@ def render_grid(obstacles, positions_xy=None, targets_xy=None, is_active=None, m
 
 class CommonSettings(BaseModel):
     MOVES: list = [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1], ]
+    # 0 - wait, 1 - counter-clockwise rotation, 2 - clockwise rotation, 3 - move forward
+    OMOVES: list = [[[0, 0, 0], [0, 0, 3], [0, 0, 1], [0, 1, 0]],
+                    [[0, 0, 1], [0, 0, 0], [0, 0, 2], [-1, 0, 1]],
+                    [[0, 0, 2], [0, 0, 1], [0, 0, 3], [0, -1, 2]],
+                    [[0, 0, 3], [0, 0, 2], [0, 0, 0], [1, 0, 3]]]
     FREE: Literal[0] = 0
     OBSTACLE: Literal[1] = 1
     empty_outside: bool = True
