@@ -49,7 +49,7 @@ class AnimationConfig(BaseModel):
     egocentric_idx: typing.Optional[int] = None
     uid: typing.Optional[str] = None
     save_every_idx_episode: typing.Optional[int] = 1
-    show_border: bool = True
+    # show_border: bool = True
     show_lines: bool = False
 
 
@@ -324,26 +324,23 @@ class AnimationMonitor(Wrapper):
         """
         cfg = self.svg_settings
         grid_lines = []
-        for i in range(-1, grid_holder.height + 1):
-            # vertical lines
-            x0 = x1 = i * cfg.scale_size + cfg.scale_size / 2
-            y0 = 0
-            y1 = render_height
-            grid_lines.append(
-                Line(x1=x0, y1=y0, x2=x1, y2=y1, stroke=cfg.obstacle_color, stroke_width=cfg.stroke_width // 1.5))
-        for i in range(-1, grid_holder.width + 1):
-            # continue
-            # horizontal lines
-            x0 = 0
-            y0 = y1 = i * cfg.scale_size + cfg.scale_size / 2
-            x1 = render_width
-            grid_lines.append(
-                Line(x1=x0, y1=y0, x2=x1, y2=y1, stroke=cfg.obstacle_color, stroke_width=cfg.stroke_width // 1.5))
+        r = self.grid_config.obs_radius
+        offset = (r - 1) * cfg.scale_size
+        stroke_settings = {'stroke': cfg.obstacle_color, 'stroke_width': cfg.stroke_width // 1.5}
 
-        # for i in range(grid_holder.width):
-        #     grid_lines.append(Line(start=(0, i * cfg.scale_size),
-        #                            end=(grid_holder.height * cfg.scale_size, i * cfg.scale_size),
-        #                            stroke=cfg.grid_color, stroke_width=cfg.grid_width))
+        def add_line(x0, y0, x1, y1):
+            grid_lines.append(Line(x1=x0, y1=y0, x2=x1, y2=y1, **stroke_settings))
+
+        for i in range(-1 + r, grid_holder.height + 2 - r):
+            # vertical lines
+            x = i * cfg.scale_size + cfg.scale_size / 2
+            add_line(x, offset, x, render_height - offset)
+
+        for i in range(-1 + r, grid_holder.width + 2 - r):
+            # horizontal lines
+            y = i * cfg.scale_size + cfg.scale_size / 2
+            add_line(offset, y, render_width - offset, y)
+
         return grid_lines
 
     def save_animation(self, name='render.svg', animation_config: typing.Optional[AnimationConfig] = None):
@@ -571,13 +568,11 @@ class AnimationMonitor(Wrapper):
         cfg = self.svg_settings
 
         result = []
-        r = self.grid_config.obs_radius
+
         for i in range(gh.height):
             for j in range(gh.width):
                 x, y = self.fix_point(i, j, gh.width)
-                if not animation_config.show_border:
-                    if i == r - 1 or j == r - 1 or j == gh.width - r or i == gh.height - r:
-                        continue
+
                 if gh.obstacles[x][y] != self.grid_config.FREE:
                     obs_settings = {}
                     obs_settings.update(x=cfg.draw_start + i * cfg.scale_size - cfg.r,
