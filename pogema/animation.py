@@ -1,34 +1,36 @@
+import math
 import os
 import typing
+from dataclasses import dataclass
 from itertools import cycle
 from gymnasium import logger, Wrapper
 
-from pydantic import BaseModel
-
-from pogema import GridConfig, pogema_v0
+from pogema import GridConfig, pogema_v0, BatchAStarAgent
+from pogema.svg_objects import Line, RectangleHref, Animation, Circle, Rectangle
 from pogema.grid import Grid
 from pogema.wrappers.persistence import PersistentWrapper, AgentState
 
 
-class AnimationSettings(BaseModel):
+@dataclass
+class AnimationSettings:
     """
     Settings for the animation.
     """
     r: int = 35
     stroke_width: int = 10
     scale_size: int = 100
-    time_scale: float = 0.28
+    time_scale: float = 0.25
     draw_start: int = 100
     rx: int = 15
 
     obstacle_color: str = '#84A1AE'
     ego_color: str = '#c1433c'
-    ego_other_color: str = '#72D5C8'
+    ego_other_color: str = '#6e81af'
     shaded_opacity: float = 0.2
     egocentric_shaded: bool = True
     stroke_dasharray: int = 25
 
-    colors: list = [
+    colors: tuple = (
         '#c1433c',
         '#2e6f9e',
         '#6e81af',
@@ -36,10 +38,11 @@ class AnimationSettings(BaseModel):
         '#72D5C8',
         '#0ea08c',
         '#8F7B66',
-    ]
+    )
 
 
-class AnimationConfig(BaseModel):
+@dataclass
+class AnimationConfig:
     """
     Configuration for the animation.
     """
@@ -49,11 +52,11 @@ class AnimationConfig(BaseModel):
     egocentric_idx: typing.Optional[int] = None
     uid: typing.Optional[str] = None
     save_every_idx_episode: typing.Optional[int] = 1
-    # show_border: bool = True
-    show_lines: bool = False
+    show_lines: bool = True
 
 
-class GridHolder(BaseModel):
+@dataclass
+class GridHolder:
     """
     Holds the grid and the history.
     """
@@ -65,96 +68,43 @@ class GridHolder(BaseModel):
     history: list = None
 
 
-class SvgObject:
-    """
-    Main class for the SVG.
-    """
-    tag = None
-
-    def __init__(self, **kwargs):
-        self.attributes = kwargs
-        self.animations = []
-
-    def add_animation(self, animation):
-        self.animations.append(animation)
-
-    @staticmethod
-    def render_attributes(attributes):
-        result = " ".join([f'{x.replace("_", "-")}="{y}"' for x, y in sorted(attributes.items())])
-        return result
-
-    def render(self):
-        animations = '\n'.join([a.render() for a in self.animations]) if self.animations else None
-        if animations:
-            return f"<{self.tag} {self.render_attributes(self.attributes)}> {animations} </{self.tag}>"
-        return f"<{self.tag} {self.render_attributes(self.attributes)} />"
-
-
-class Rectangle(SvgObject):
-    """
-    Rectangle class for the SVG.
-    """
-    tag = 'rect'
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.attributes['y'] = -self.attributes['y'] - self.attributes['height']
-
-
-class Circle(SvgObject):
-    """
-    Circle class for the SVG.
-    """
-    tag = 'circle'
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.attributes['cy'] = -self.attributes['cy']
-
-
-class Line(SvgObject):
-    """
-    Line class for the SVG.
-    """
-    tag = 'line'
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.attributes['y1'] = -self.attributes['y1']
-        self.attributes['y2'] = -self.attributes['y2']
-
-
-class Animation(SvgObject):
-    """
-    Animation class for the SVG.
-    """
-    tag = 'animate'
-
-    def render(self):
-        return f"<{self.tag} {self.render_attributes(self.attributes)}/>"
-
-
 class Drawing:
     """
     Drawing, analog of the DrawSvg class in the pogema package.
     """
 
-    def __init__(self, height, width, display_inline=False, origin=(0, 0)):
+    def __init__(self, height, width, svg_settings, display_inline=False, origin=(0, 0)):
         self.height = height
         self.width = width
         self.display_inline = display_inline
         self.origin = origin
         self.elements = []
+        self.svg_settings = svg_settings
 
     def add_element(self, element):
         self.elements.append(element)
 
     def render(self):
         view_box = (0, -self.height, self.width, self.height)
+        width = self.width
+        height = self.height
+        t = max(height, width) / 512
+        width = math.ceil(width / t)
+        height = math.ceil(height / t)
+
         results = [f'''<?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-             width="{self.width // 10}" height="{self.height // 10}" viewBox="{" ".join(map(str, view_box))}">''',
-                   '\n<defs>\n', '</defs>\n']
+             width="{width}" height="{height}" viewBox="{" ".join(map(str, view_box))}">''',
+                   '\n<defs>\n',
+                   f'<rect id="obstacle" width="{self.svg_settings.r * 2}" height="{self.svg_settings.r * 2}" fill="{self.svg_settings.obstacle_color}" rx="{self.svg_settings.rx}"/>',
+                   '',
+                   '<style>',
+                   '.line {' + f'stroke: {self.svg_settings.obstacle_color}; stroke-width: {self.svg_settings.stroke_width};' + '}',
+                   '.agent {' + f'r: {self.svg_settings.r}' + '}',
+                   '.target {' + f'fill: none; stroke-width: {self.svg_settings.stroke_width}; r: {self.svg_settings.r}' + '}',
+                   # '.rect { fill: #84A1AE; rx: 15;}',
+                   '</style>',
+                   '</defs>\n']
         for element in self.elements:
             results.append(element.render())
         results.append('</svg>')
@@ -285,7 +235,7 @@ class AnimationMonitor(Wrapper):
 
         render_width, render_height = gh.height * cfg.scale_size + cfg.scale_size, gh.width * cfg.scale_size + cfg.scale_size
 
-        drawing = Drawing(width=render_width, height=render_height, display_inline=False, origin=(0, 0))
+        drawing = Drawing(width=render_width, height=render_height, svg_settings=self.svg_settings)
         obstacles = self.create_obstacles(gh, anim_cfg)
 
         agents = []
@@ -299,7 +249,7 @@ class AnimationMonitor(Wrapper):
                 self.animate_agents(agents, anim_cfg.egocentric_idx, gh)
                 self.animate_targets(targets, gh, anim_cfg)
         if anim_cfg.show_lines:
-            grid_lines = self.create_grid_lines(gh, anim_cfg, render_width, render_height)
+            grid_lines = self.create_grid_lines(gh, render_width, render_height)
             for line in grid_lines:
                 drawing.add_element(line)
         for obj in [*obstacles, *agents, *targets, ]:
@@ -314,32 +264,19 @@ class AnimationMonitor(Wrapper):
 
         return drawing
 
-    def create_grid_lines(self, grid_holder: GridHolder, animation_config: AnimationConfig, render_width,
-                          render_height):
-        """
-        Creates the grid lines.
-        :param grid_holder: grid holder
-        :param animation_config: animation configuration
-        :return: grid_lines: list of grid lines
-        """
-        cfg = self.svg_settings
-        grid_lines = []
-        r = self.grid_config.obs_radius
+    def create_grid_lines(self, grid_holder: GridHolder, render_width, render_height):
+        cfg, r = self.svg_settings, self.grid_config.obs_radius
         offset = (r - 1) * cfg.scale_size
-        stroke_settings = {'stroke': cfg.obstacle_color, 'stroke_width': cfg.stroke_width // 1.5}
-
-        def add_line(x0, y0, x1, y1):
-            grid_lines.append(Line(x1=x0, y1=y0, x2=x1, y2=y1, **stroke_settings))
+        stroke_settings = {'class': 'line'}
+        grid_lines = []
 
         for i in range(-1 + r, grid_holder.height + 2 - r):
-            # vertical lines
             x = i * cfg.scale_size + cfg.scale_size / 2
-            add_line(x, offset, x, render_height - offset)
+            grid_lines.append(Line(x1=x, y1=offset, x2=x, y2=render_height - offset, **stroke_settings))
 
         for i in range(-1 + r, grid_holder.width + 2 - r):
-            # horizontal lines
             y = i * cfg.scale_size + cfg.scale_size / 2
-            add_line(offset, y, render_width - offset, y)
+            grid_lines.append(Line(x1=offset, y1=y, x2=render_width - offset, y2=y, **stroke_settings))
 
         return grid_lines
 
@@ -356,26 +293,10 @@ class AnimationMonitor(Wrapper):
 
     @staticmethod
     def fix_point(x, y, length):
-        """
-        Fixes the point to the grid.
-        :param x: coordinate x
-        :param y: coordinate y
-        :param length: size of the grid
-        :return: x, y: fixed coordinates
-        """
         return length - y - 1, x
 
     @staticmethod
     def check_in_radius(x1, y1, x2, y2, r) -> bool:
-        """
-        Checks if the point is in the radius.
-        :param x1: coordinate x1
-        :param y1: coordinate y1
-        :param x2: coordinate x2
-        :param y2: coordinate y2
-        :param r: radius
-        :return:
-        """
         return x2 - r <= x1 <= x2 + r and y2 - r <= y1 <= y2 + r
 
     def create_field_of_view(self, grid_holder, animation_config):
@@ -577,10 +498,8 @@ class AnimationMonitor(Wrapper):
                     obs_settings = {}
                     obs_settings.update(x=cfg.draw_start + i * cfg.scale_size - cfg.r,
                                         y=cfg.draw_start + j * cfg.scale_size - cfg.r,
-                                        width=cfg.r * 2,
                                         height=cfg.r * 2,
-                                        rx=cfg.rx,
-                                        fill=self.svg_settings.obstacle_color)
+                                        )
 
                     if animation_config.egocentric_idx is not None and cfg.egocentric_shaded:
                         initial_positions = [agent_states[0].get_xy() for agent_states in gh.history]
@@ -588,7 +507,7 @@ class AnimationMonitor(Wrapper):
                         if not self.check_in_radius(x, y, ego_x, ego_y, self.grid_config.obs_radius):
                             obs_settings.update(opacity=cfg.shaded_opacity)
 
-                    result.append(Rectangle(**obs_settings))
+                    result.append(RectangleHref(**obs_settings))
 
         return result
 
@@ -626,37 +545,29 @@ class AnimationMonitor(Wrapper):
                 obstacle_idx += 1
 
     def create_agents(self, grid_holder, animation_config):
-        """
-        Creates the agents.
-        :param grid_holder:
-        :param animation_config:
-        :return:
-        """
-        gh: GridHolder = grid_holder
-        cfg = self.svg_settings
-
+        initial_positions = [state[0].get_xy() for state in grid_holder.history if state[0].is_active()]
+        ego_idx = animation_config.egocentric_idx
         agents = []
-        initial_positions = [agent_states[0].get_xy() for agent_states in gh.history]
+
         for idx, (x, y) in enumerate(initial_positions):
+            circle_settings = {
+                'cx': self.svg_settings.draw_start + y * self.svg_settings.scale_size,
+                'cy': self.svg_settings.draw_start + (grid_holder.width - x - 1) * self.svg_settings.scale_size,
+                # 'r': self.svg_settings.r,
+                'fill': grid_holder.colors[idx],
+                'class': 'agent',
+            }
 
-            if not any([agent_state.is_active() for agent_state in gh.history[idx]]):
-                continue
-
-            circle_settings = {}
-            circle_settings.update(cx=cfg.draw_start + y * cfg.scale_size,
-                                   cy=cfg.draw_start + (gh.width - x - 1) * cfg.scale_size,
-                                   r=cfg.r, fill=gh.colors[idx])
-            ego_idx = animation_config.egocentric_idx
             if ego_idx is not None:
                 ego_x, ego_y = initial_positions[ego_idx]
-                if not self.check_in_radius(x, y, ego_x, ego_y, self.grid_config.obs_radius) and cfg.egocentric_shaded:
-                    circle_settings.update(opacity=cfg.shaded_opacity)
-                if ego_idx == idx:
-                    circle_settings.update(fill=self.svg_settings.ego_color)
-                else:
-                    circle_settings.update(fill=self.svg_settings.ego_other_color)
-            agent = Circle(**circle_settings)
-            agents.append(agent)
+                is_out_of_radius = not self.check_in_radius(x, y, ego_x, ego_y, self.grid_config.obs_radius)
+                circle_settings['fill'] = self.svg_settings.ego_other_color
+                if idx == ego_idx:
+                    circle_settings['fill'] = self.svg_settings.ego_color
+                elif is_out_of_radius and self.svg_settings.egocentric_shaded:
+                    circle_settings['opacity'] = self.svg_settings.shaded_opacity
+
+            agents.append(Circle(**circle_settings))
 
         return agents
 
@@ -678,11 +589,14 @@ class AnimationMonitor(Wrapper):
             if not any([agent_state.is_active() for agent_state in gh.history[agent_idx]]):
                 continue
 
-            circle_settings = {}
+            circle_settings = {"class": 'target'}
             circle_settings.update(cx=cfg.draw_start + x * cfg.scale_size,
                                    cy=cfg.draw_start + y * cfg.scale_size,
-                                   r=cfg.r,
-                                   stroke=gh.colors[agent_idx], stroke_width=cfg.stroke_width, fill='none')
+                                   # r=cfg.r,
+                                   stroke=gh.colors[agent_idx],
+                                   # stroke_width=cfg.stroke_width,
+                                   # fill='none'
+                                   )
             if animation_config.egocentric_idx is not None:
                 if animation_config.egocentric_idx != agent_idx:
                     continue
@@ -694,15 +608,23 @@ class AnimationMonitor(Wrapper):
 
 
 def main():
-    grid_config = GridConfig(size=8, num_agents=5, obs_radius=2, seed=9, on_target='finish', max_episode_steps=128)
+    grid = """
+    ...#.
+    .#...
+    .....
+    ##.#.
+    """
+    grid_config = GridConfig(size=32, num_agents=2, obs_radius=2, seed=9, on_target='restart', max_episode_steps=16,
+                             density=0.1, map=grid, observation_type="POMAPF")
     env = pogema_v0(grid_config=grid_config)
     env = AnimationMonitor(env)
 
-    env.reset()
-    done = [False]
+    obs, _ = env.reset()
+    truncated = terminated = [False]
 
-    while not all(done):
-        _, _, done, _ = env.step(env.sample_actions())
+    agent = BatchAStarAgent()
+    while not all(terminated) and not all(truncated):
+        obs, _, terminated, truncated, _ = env.step(agent.act(obs))
 
     env.save_animation('out-static.svg', AnimationConfig(static=True, save_every_idx_episode=None))
     env.save_animation('out-static-ego.svg', AnimationConfig(egocentric_idx=0, static=True))
