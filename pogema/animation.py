@@ -363,7 +363,7 @@ class AnimationMonitor(Wrapper):
             x_path = []
             y_path = []
             opacity = []
-            for agent_state in gh.history[agent_idx]:
+            for idx, agent_state in enumerate(gh.history[agent_idx]):
                 x, y = agent_state.get_xy()
 
                 x_path.append(str(cfg.draw_start + y * cfg.scale_size))
@@ -553,7 +553,7 @@ class AnimationMonitor(Wrapper):
             circle_settings = {
                 'cx': self.svg_settings.draw_start + y * self.svg_settings.scale_size,
                 'cy': self.svg_settings.draw_start + (grid_holder.width - x - 1) * self.svg_settings.scale_size,
-                # 'r': self.svg_settings.r,
+                'r': self.svg_settings.r,
                 'fill': grid_holder.colors[idx],
                 'class': 'agent',
             }
@@ -592,7 +592,7 @@ class AnimationMonitor(Wrapper):
             circle_settings = {"class": 'target'}
             circle_settings.update(cx=cfg.draw_start + x * cfg.scale_size,
                                    cy=cfg.draw_start + y * cfg.scale_size,
-                                   # r=cfg.r,
+                                   r=cfg.r,
                                    stroke=gh.colors[agent_idx],
                                    # stroke_width=cfg.stroke_width,
                                    # fill='none'
