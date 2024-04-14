@@ -73,7 +73,7 @@ class Drawing:
     Drawing, analog of the DrawSvg class in the pogema package.
     """
 
-    def __init__(self, height, width, svg_settings, display_inline=False, origin=(0, 0)):
+    def __init__(self, height, width, svg_settings, display_inline=False, origin=(0, 0), ):
         self.height = height
         self.width = width
         self.display_inline = display_inline
@@ -85,12 +85,18 @@ class Drawing:
         self.elements.append(element)
 
     def render(self):
-        view_box = (0, -self.height, self.width, self.height)
         width = self.width
         height = self.height
-        t = max(height, width) / 512
-        width = math.ceil(width / t)
-        height = math.ceil(height / t)
+
+        # width = 256
+        # height = 256
+
+        dx, dy = self.origin
+        view_box = (0 + dx, -height + dy, width, height)
+
+        # scale = max(height, width) / 512
+        # width = math.ceil(width / scale)
+        # height = math.ceil(height / scale)
 
         results = [f'''<?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -232,10 +238,13 @@ class AnimationMonitor(Wrapper):
                         colors=agents_colors,
                         episode_length=episode_length,
                         history=decompressed_history, )
-
-        render_width, render_height = gh.height * cfg.scale_size + cfg.scale_size, gh.width * cfg.scale_size + cfg.scale_size
-
-        drawing = Drawing(width=render_width, height=render_height, svg_settings=self.svg_settings)
+        render_width = gh.height * cfg.scale_size + cfg.scale_size
+        render_height = gh.width * cfg.scale_size + cfg.scale_size
+        r = self.grid_config.obs_radius - 1
+        drw = render_width - cfg.scale_size * r * 2
+        drh = render_height - cfg.scale_size * r * 2
+        drawing = Drawing(width=drw, height=drh, svg_settings=self.svg_settings,
+                          origin=[cfg.scale_size * r, -cfg.scale_size * r])
         obstacles = self.create_obstacles(gh, anim_cfg)
 
         agents = []
