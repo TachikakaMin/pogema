@@ -88,15 +88,12 @@ class Drawing:
         width = self.width
         height = self.height
 
-        # width = 256
-        # height = 256
-
         dx, dy = self.origin
         view_box = (0 + dx, -height + dy, width, height)
 
-        # scale = max(height, width) / 512
-        # width = math.ceil(width / scale)
-        # height = math.ceil(height / scale)
+        scale = max(height, width) / 512
+        width = math.ceil(width / scale)
+        height = math.ceil(height / scale)
 
         results = [f'''<?xml version="1.0" encoding="UTF-8"?>
         <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
