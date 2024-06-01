@@ -6,7 +6,6 @@ from pogema.utils import CommonSettings
 
 from typing_extensions import Literal
 
-
 class GridConfig(CommonSettings, ):
     on_target: Literal['finish', 'nothing', 'restart'] = 'finish'
     seed: Optional[int] = None
@@ -16,6 +15,8 @@ class GridConfig(CommonSettings, ):
     obs_radius: int = 5
     agents_xy: Optional[list] = None
     targets_xy: Optional[list] = None
+    possible_agents_xy: Optional[list] = None
+    possible_targets_xy: Optional[list] = None
     collision_system: Literal['block_both', 'priority', 'soft'] = 'priority'
     persistent: bool = False
     observation_type: Literal['POMAPF', 'MAPF', 'default'] = 'default'
@@ -53,18 +54,23 @@ class GridConfig(CommonSettings, ):
         return v
 
     @validator('map', always=True)
-    def map_validation(cls, v, values, ):
+    def map_validation(cls, v, values):
         if v is None:
             return None
         if isinstance(v, str):
-            v, agents_xy, targets_xy = cls.str_map_to_list(v, values['FREE'], values['OBSTACLE'])
-            if agents_xy and targets_xy and values['agents_xy'] is not None and values['targets_xy'] is not None:
-                raise KeyError("""Can't create task. Please provide agents_xy and targets_xy only ones.
+            v, agents_xy, targets_xy, possible_agents_xy, possible_targets_xy = cls.str_map_to_list(v, values['FREE'], values['OBSTACLE'])
+            if agents_xy and targets_xy and values.get('agents_xy') is not None and values.get('targets_xy') is not None:
+                raise KeyError("""Can't create task. Please provide agents_xy and targets_xy only once.
                 Either with parameters or with a map.""")
+            if (agents_xy or targets_xy) and (possible_agents_xy or possible_targets_xy):
+                raise KeyError("""Can't create task. Mark either possible locations or precise ones.""")
             elif agents_xy and targets_xy:
                 values['agents_xy'] = agents_xy
                 values['targets_xy'] = targets_xy
                 values['num_agents'] = len(agents_xy)
+            elif (values.get('agents_xy') is None or values.get('targets_xy') is None) and possible_agents_xy and possible_targets_xy:
+                values['possible_agents_xy'] = possible_agents_xy
+                values['possible_targets_xy'] = possible_targets_xy
         size = len(v)
         area = 0
         for line in v:
@@ -87,7 +93,15 @@ class GridConfig(CommonSettings, ):
             cls.check_positions(v, values['size'])
             values['num_agents'] = len(v)
         return v
+    
+    @validator('possible_agents_xy')
+    def possible_agents_xy_validation(cls, v):
+        return v
 
+    @validator('possible_targets_xy')
+    def possible_targets_xy_validation(cls, v):
+        return v
+    
     @staticmethod
     def check_positions(v, size):
         for position in v:
@@ -100,9 +114,11 @@ class GridConfig(CommonSettings, ):
         obstacles = []
         agents = {}
         targets = {}
-        for idx, line in enumerate(str_map.split()):
+        possible_agents_xy = []
+        possible_targets_xy = []
+        for row_idx, line in enumerate(str_map.split()):
             row = []
-            for char in line:
+            for col_idx, char in enumerate(line):
                 if char == '.':
                     row.append(free)
                 elif char == '#':
@@ -113,11 +129,21 @@ class GridConfig(CommonSettings, ):
                 elif 'a' <= char <= 'z':
                     agents[char.lower()] = len(obstacles), len(row)
                     row.append(free)
+                elif char == '$':
+                    possible_agents_xy.append((row_idx, col_idx))
+                    row.append(free)
+                elif char == '@':
+                    possible_targets_xy.append((row_idx, col_idx))
+                    row.append(free)
+                elif char == '&':
+                    possible_agents_xy.append((row_idx, col_idx))
+                    possible_targets_xy.append((row_idx, col_idx))
+                    row.append(free)
                 else:
-                    raise KeyError(f"Unsupported symbol '{char}' at line {idx}")
+                    raise KeyError(f"Unsupported symbol '{char}' at line {row_idx}")
             if row:
                 if obstacles:
-                    assert len(obstacles[-1]) == len(row), f"Wrong string size for row {idx};"
+                    assert len(obstacles[-1]) == len(row), f"Wrong string size for row {row_idx};"
                 obstacles.append(row)
 
         targets_xy = []
@@ -128,7 +154,7 @@ class GridConfig(CommonSettings, ):
             targets_xy.append([x, y])
 
         assert len(targets_xy) == len(agents_xy)
-        return obstacles, agents_xy, targets_xy
+        return obstacles, agents_xy, targets_xy, possible_agents_xy, possible_targets_xy
 
 
 class PredefinedDifficultyConfig(GridConfig):
