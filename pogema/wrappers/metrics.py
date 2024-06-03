@@ -124,3 +124,20 @@ class ISRMetric(AbstractMetric):
             results = {'ISR': self._solved_instances / self.get_num_agents()}
             self._solved_instances = 0
             return results
+
+class SOC_MakespanMetric(AbstractMetric):
+    def __init__(self, env):
+        super().__init__(env)
+        self._solve_time = [None for _ in range(self.get_num_agents())]
+    
+    def _compute_stats(self, step, is_on_goal, finished):
+        for idx, on_goal in enumerate(is_on_goal):
+            if self._solve_time[idx] is None and (on_goal or finished):
+                self._solve_time[idx] = step
+            if not on_goal and not finished:
+                self._solve_time[idx] = None
+
+        if finished:
+            result = {'SoC': sum(self._solve_time) + self.get_num_agents(), 'makespan': max(self._solve_time) + 1}
+            self._solve_time = [None for _ in range(self.get_num_agents())]
+            return result
