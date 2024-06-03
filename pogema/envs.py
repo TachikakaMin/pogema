@@ -7,7 +7,7 @@ from gymnasium.error import ResetNeeded
 from pogema.grid import Grid, GridLifeLong
 from pogema.grid_config import GridConfig
 from pogema.wrappers.metrics import LifeLongAverageThroughputMetric, NonDisappearEpLengthMetric, \
-    NonDisappearCSRMetric, NonDisappearISRMetric, EpLengthMetric, ISRMetric, CSRMetric
+    NonDisappearCSRMetric, NonDisappearISRMetric, EpLengthMetric, ISRMetric, CSRMetric, SOC_MakespanMetric
 from pogema.wrappers.multi_time_limit import MultiTimeLimit
 from pogema.generator import generate_new_target, generate_from_possible_targets
 from pogema.wrappers.persistence import PersistentWrapper
@@ -302,9 +302,10 @@ class PogemaLifeLong(Pogema):
 
     def _generate_new_target(self, agent_idx):
         if self.grid_config.possible_targets_xy is not None:
-            return generate_from_possible_targets(self.random_generators[agent_idx], 
+            new_goal = generate_from_possible_targets(self.random_generators[agent_idx], 
                                                      self.grid_config.possible_targets_xy, 
                                                      self.grid.positions_xy[agent_idx])
+            return (new_goal[0] + self.grid_config.obs_radius, new_goal[1] + self.grid_config.obs_radius)
         else:
             return generate_new_target(self.random_generators[agent_idx],
                                     self.grid.point_to_component,
@@ -390,6 +391,7 @@ def _make_pogema(grid_config):
             env = NonDisappearISRMetric(env)
             env = NonDisappearCSRMetric(env)
             env = NonDisappearEpLengthMetric(env)
+            env = SOC_MakespanMetric(env)
         elif grid_config.on_target == 'finish':
             env = ISRMetric(env)
             env = CSRMetric(env)
