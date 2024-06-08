@@ -7,7 +7,7 @@ from gymnasium.error import ResetNeeded
 from pogema.grid import Grid, GridLifeLong
 from pogema.grid_config import GridConfig
 from pogema.wrappers.metrics import LifeLongAverageThroughputMetric, NonDisappearEpLengthMetric, \
-    NonDisappearCSRMetric, NonDisappearISRMetric, EpLengthMetric, ISRMetric, CSRMetric, SOC_MakespanMetric
+    NonDisappearCSRMetric, NonDisappearISRMetric, EpLengthMetric, ISRMetric, CSRMetric, SumOfCostsAndMakespanMetric
 from pogema.wrappers.multi_time_limit import MultiTimeLimit
 from pogema.generator import generate_new_target, generate_from_possible_targets
 from pogema.wrappers.persistence import PersistentWrapper
@@ -391,7 +391,7 @@ def _make_pogema(grid_config):
             env = NonDisappearISRMetric(env)
             env = NonDisappearCSRMetric(env)
             env = NonDisappearEpLengthMetric(env)
-            env = SOC_MakespanMetric(env)
+            env = SumOfCostsAndMakespanMetric(env)
         elif grid_config.on_target == 'finish':
             env = ISRMetric(env)
             env = CSRMetric(env)
