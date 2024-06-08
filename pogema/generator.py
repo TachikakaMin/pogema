@@ -126,9 +126,9 @@ def generate_positions_and_targets_fast(obstacles, grid_config):
     return placing(order=order, components=components, grid=grid, start_id=start_id, num_agents=c.num_agents)
 
 def generate_from_possible_targets(rnd_generator, possible_positions, position):
-    new_target = rnd_generator.choice(possible_positions, 1)
+    new_target = tuple(rnd_generator.choice(possible_positions, 1)[0])
     while new_target == position:
-        new_target = rnd_generator.choice(possible_positions, 1)
+        new_target = tuple(rnd_generator.choice(possible_positions, 1)[0])
     return new_target
 
 def generate_new_target(rnd_generator, point_to_component, component_to_points, position):
