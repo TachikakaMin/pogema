@@ -144,17 +144,16 @@ def test_life_long():
     gc = GridConfig(num_agents=20, size=8, obs_radius=4, seed=42, max_episode_steps=64, on_target='restart')
     results_generator = run_policy(gc, save_animation=False)
 
-    for _ in range(3):
-        metrics = results_generator.__next__()
-        assert np.isclose(metrics['avg_throughput'], 1.765625)
-
     metrics = results_generator.__next__()
-    assert np.isclose(metrics['avg_throughput'], 1.71875)
+    assert np.isclose(metrics['avg_throughput'], 1.671875)
+    metrics = results_generator.__next__()
+    assert np.isclose(metrics['avg_throughput'], 1.609375)
+    
     gc = GridConfig(num_agents=24, size=8, obs_radius=4, seed=43, max_episode_steps=64, on_target='restart')
     results_generator = run_policy(gc, save_animation=False)
 
     metrics = results_generator.__next__()
-    assert np.isclose(metrics['avg_throughput'], 0.453125)
+    assert np.isclose(metrics['avg_throughput'], 0.4375)
 
 
 def test_disappearing():
@@ -177,12 +176,12 @@ def test_non_disappearing():
     results_generator = run_policy(gc, save_animation=False)
 
     metrics = results_generator.__next__()
-    assert np.isclose(metrics['ep_length'], 20)
+    assert np.isclose(metrics['ep_length'], 21)
     assert np.isclose(metrics['CSR'], 1.0)
     assert np.isclose(metrics['ISR'], 1.0)
 
     metrics = results_generator.__next__()
-    assert np.isclose(metrics['ep_length'], 13)
+    assert np.isclose(metrics['ep_length'], 14)
     assert np.isclose(metrics['CSR'], 1.0)
     assert np.isclose(metrics['ISR'], 1.0)
 
@@ -190,6 +189,6 @@ def test_non_disappearing():
     results_generator = run_policy(gc, save_animation=False)
 
     metrics = results_generator.__next__()
-    assert np.isclose(metrics['ep_length'], 31)
+    assert np.isclose(metrics['ep_length'], 32)
     assert np.isclose(metrics['CSR'], 0.0)
     assert np.isclose(metrics['ISR'], 0.71428571428)

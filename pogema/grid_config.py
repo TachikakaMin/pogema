@@ -12,18 +12,18 @@ class GridConfig(CommonSettings, ):
     seed: Optional[int] = None
     size: int = 8
     density: float = 0.3
-    num_agents: int = 1
     obs_radius: int = 5
     agents_xy: Optional[list] = None
     targets_xy: Optional[list] = None
+    num_agents: Optional[int] = None
     possible_agents_xy: Optional[list] = None
     possible_targets_xy: Optional[list] = None
     collision_system: Literal['block_both', 'priority', 'soft'] = 'priority'
     persistent: bool = False
     observation_type: Literal['POMAPF', 'MAPF', 'default'] = 'default'
-    map: Union[list, str] = None
+    map: Optional[Union[list, str]] = None
 
-    map_name: str = None
+    map_name: Optional[str] = None
 
     integration: Literal['SampleFactory', 'PyMARL', 'rllib', 'gymnasium', 'PettingZoo'] = None
     max_episode_steps: int = 64
@@ -36,7 +36,7 @@ class GridConfig(CommonSettings, ):
 
     @validator('size')
     def size_restrictions(cls, v):
-        assert 2 <= v <= 1024, "size must be in [2, 1024]"
+        assert 2 <= v <= 4096, "size must be in [2, 4096]"
         return v
 
     @validator('density')
@@ -44,9 +44,26 @@ class GridConfig(CommonSettings, ):
         assert 0.0 <= v <= 1, "density must be in [0, 1]"
         return v
 
-    @validator('num_agents')
-    def num_agents_must_be_positive(cls, v):
-        assert 1 <= v <= 10000, "num_agents must be in [1, 10000]"
+    @validator('agents_xy')
+    def agents_xy_validation(cls, v, values):
+        if v is not None:
+            cls.check_positions(v, values['size'])
+        return v
+
+    @validator('targets_xy')
+    def targets_xy_validation(cls, v, values):
+        if v is not None:
+            cls.check_positions(v, values['size'])
+        return v
+
+    @validator('num_agents', always=True)
+    def num_agents_must_be_positive(cls, v, values):
+        if v is None:
+            if values['agents_xy']:
+                v = len(values['agents_xy'])
+            else:
+                v = 1
+        assert 1 <= v <= 10000000, "num_agents must be in [1, 10000000]"
         return v
 
     @validator('obs_radius')
@@ -82,20 +99,7 @@ class GridConfig(CommonSettings, ):
             area += len(line)
         values['size'] = size
         values['density'] = sum([sum(line) for line in v]) / area
-        return v
 
-    @validator('agents_xy')
-    def agents_xy_validation(cls, v, values):
-        if v is not None:
-            cls.check_positions(v, values['size'])
-            values['num_agents'] = len(v)
-        return v
-
-    @validator('targets_xy')
-    def targets_xy_validation(cls, v, values):
-        if v is not None:
-            cls.check_positions(v, values['size'])
-            values['num_agents'] = len(v)
         return v
 
     @validator('possible_agents_xy')
