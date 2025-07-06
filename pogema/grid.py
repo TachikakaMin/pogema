@@ -2,6 +2,7 @@ from copy import deepcopy
 import warnings
 
 import numpy as np
+from collections import deque
 
 from pogema.generator import generate_obstacles, generate_positions_and_targets_fast, \
     get_components, generate_from_possible_positions
@@ -72,6 +73,8 @@ class Grid:
         self.positions_xy = self.starts_xy
         self._initial_xy = deepcopy(self.starts_xy)
         self.is_active = {agent_id: True for agent_id in range(self.config.num_agents)}
+        
+        self._prepare_railgun_features()
 
     def add_artificial_border(self):
         gc = self.config
@@ -123,6 +126,62 @@ class Grid:
             positions = self._cut_borders_xy(positions, gc.obs_radius)
 
         return positions
+
+    def _prepare_railgun_features(self):
+        # Important thing is to precompute the distance map.
+
+        # Distance map functions adapted from railgun tools/utils.py
+        NOT_FOUND_PATH = -1
+        def _calculate_single_point_distances(args):
+            start, map_data, n, m = args
+            directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+            
+            i, j = start
+            dist = np.full((n, m), fill_value=NOT_FOUND_PATH, dtype=np.int32)
+            dist[i][j] = 0
+
+            queue = deque()
+            queue.append((i, j))
+
+            while queue:
+                x, y = queue.popleft()
+                for dx, dy in directions:
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < n and 0 <= ny < m:
+                        if map_data[nx][ny] == 0 and dist[nx][ny] == NOT_FOUND_PATH:
+                            dist[nx][ny] = dist[x][y] + 1
+                            queue.append((nx, ny))
+            
+            return (start, dist)
+
+        def _create_distance_map(map_data):
+
+            n, m = map_data.shape
+            accessible_points = [
+                (i, j) for j in range(m) for i in range(n) if map_data[i, j] == 0
+            ]
+            
+            args = [(start, map_data, n, m) for start in accessible_points]
+            dist_matrix = dict()
+            for args_tuple in args:
+                single_result = _calculate_single_point_distances(args_tuple)
+                dist_matrix[single_result[0]] = single_result[1]
+            return dist_matrix
+            """
+            # 使用CPU核心数作为进程数
+            # num_processes = multiprocessing.cpu_count()
+            
+            # 创建进程池并执行并行计算
+            with Pool(processes=1) as pool:
+                results = list(pool.imap(_calculate_single_point_distances, args))
+            
+            # 将结果转换为字典
+            dist_matrix = dict(results)
+            """
+            
+            return dist_matrix
+        self.distance_maps = _create_distance_map(self.get_obstacles(ignore_borders=True))
+
 
     def get_agents_xy(self, only_active=False, ignore_borders=False):
         return self._prepare_positions(deepcopy(self.positions_xy), only_active, ignore_borders)

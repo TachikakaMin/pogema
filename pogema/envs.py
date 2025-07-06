@@ -1,6 +1,7 @@
 from typing import Optional
 
 import numpy as np
+import torch
 import gymnasium
 from gymnasium.error import ResetNeeded
 
@@ -11,7 +12,7 @@ from pogema.wrappers.metrics import LifeLongAverageThroughputMetric, NonDisappea
 from pogema.wrappers.multi_time_limit import MultiTimeLimit
 from pogema.generator import generate_new_target, generate_from_possible_targets
 from pogema.wrappers.persistence import PersistentWrapper
-
+from pogema.railgun_utils import construct_input_feature
 
 class ActionsSampler:
     """
@@ -118,6 +119,8 @@ class Pogema(PogemaBase):
                 # global_xy=None,
                 # global_target_xy=None,
             )
+        elif self.grid_config.observation_type == "RAILGUN":
+            self.observation_space = gymnasium.spaces.Box(-1024, 4096, shape=(6, grid_config.size, grid_config.size))
         else:
             raise ValueError(f"Unknown observation type: {self.grid.config.observation_type}")
 
@@ -187,6 +190,20 @@ class Pogema(PogemaBase):
                 result['global_target_xy'] = global_targets_xy[agent_idx]
 
             return results
+        elif self.grid_config.observation_type == "RAILGUN":
+            # Construct input features
+            # construct_input_feature()
+            agent_locs = torch.tensor(self.grid.get_agents_xy(ignore_borders=True)) # This is a num_agent-len list, which we convert.
+            goal_locs = torch.tensor(self.grid.get_targets_xy(ignore_borders=True))
+            inp_feat = construct_input_feature(
+                self.get_obstacles(ignore_borders=True), # Obstacles, either 0 or 1
+                agent_locs, # numpy array of shape (num_agents, 2)
+                goal_locs, # numpy array of shape (num_agents, 2)
+                self.grid.distance_maps, # distance map from grid
+                6,
+                "gradient"
+            )
+            return [inp_feat] * self.grid_config.num_agents
         else:
             raise ValueError(f"Unknown observation type: {self.grid.config.observation_type}")
 

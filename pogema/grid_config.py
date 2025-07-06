@@ -20,7 +20,7 @@ class GridConfig(CommonSettings, ):
     possible_targets_xy: Optional[list] = None
     collision_system: Literal['block_both', 'priority', 'soft'] = 'priority'
     persistent: bool = False
-    observation_type: Literal['POMAPF', 'MAPF', 'default'] = 'default'
+    observation_type: Literal['POMAPF', 'MAPF', 'default', 'RAILGUN'] = 'default'
     map: Optional[Union[list, str]] = None
 
     map_name: Optional[str] = None
