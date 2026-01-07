@@ -1,14 +1,14 @@
 <div align="center">
 
 
-[![Pogema logo](https://raw.githubusercontent.com/Tviskaron/pogema-pics/main/pogema-logo-v1.svg)](https://github.com/AIRI-Institute/pogema)    
+[![Pogema logo](https://raw.githubusercontent.com/Tviskaron/pogema-pics/main/pogema-logo-v1.svg)](https://github.com/Cognitive-AI-Systems/pogema)    
 
 **Partially-Observable Grid Environment for Multiple Agents**
 
 [![CodeFactor](https://www.codefactor.io/repository/github/tviskaron/pogema/badge)](https://www.codefactor.io/repository/github/tviskaron/pogema)
 [![Downloads](https://static.pepy.tech/badge/pogema)](https://pepy.tech/project/pogema)
-[![CI](https://github.com/CognitiveAISystems/pogema/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/AIRI-Institute/pogema/actions/workflows/CI.yml) 
-[![CodeQL](https://github.com/CognitiveAISystems/pogema/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/AIRI-Institute/pogema/actions/workflows/codeql-analysis.yml)    
+[![CI](https://github.com/Cognitive-AI-Systems/pogema/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Cognitive-AI-Systems/pogema/actions/workflows/CI.yml)
+[![CodeQL](https://github.com/Cognitive-AI-Systems/pogema/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/Cognitive-AI-Systems/pogema/actions/workflows/codeql-analysis.yml) 
     
 </div> 
 
